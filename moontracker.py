@@ -1,7 +1,5 @@
-from collections import namedtuple
 from math import pi, sin, cos, tan, asin, atan2, acos
 import mooncalc
-from network import WLAN
 import time
 
 # Find out whether we are running micropython or not also, micropython
@@ -42,7 +40,6 @@ FAST_FORWARD_FACTOR = 1 # to simlate faster speed, set to value >1, e.g. 100
 if MICROPYTHON == 1 and UNIX == 0:
     from machine import UART, Pin, PWM, RTC
     from neopixel import NeoPixel
-    import ntptime
     import tm1638
     import uasyncio as asyncio
     import utime
@@ -72,12 +69,11 @@ if MICROPYTHON == 1 and UNIX == 0:
     # Create a GPS module instance.
     mygps = MicropyGPS(location_formatting='dd')
 
-    if 0: # TODO
-        # (optional) neopixel led to mounted on pointing arm to indicate if the
-        #  moon is up in the sky or not. If not, we turn Neopixel off (this way, we
-        # CAN address the lower hemisphere after all)
-        npPin = Pin(23, Pin.OUT)
-        np = NeoPixel(npPin,1)
+    # neopixel led to mounted on pointing arm to indicate if the
+    #  moon is up in the sky or not. If not, we turn Neopixel off (this way, we
+    # CAN address the lower hemisphere after all)
+    npPin = Pin(23, Pin.OUT)
+    np = NeoPixel(npPin,2)
 else:
     import asyncio
 
@@ -134,7 +130,6 @@ latitude = 0 # these will be changed by GPS periodically
 longitude = 0
 
 async def tracker(delay_ms):
-    intensity = 0
     t = time.time()
     while True:
         pos = mooncalc.get_moon_position(t + DELTA_T + TIME_EPOCH_DIFF,
@@ -208,13 +203,14 @@ async def tracker(delay_ms):
             tm_str="{:=4d}{:=4d}".format(x,y)
             tm.show(tm_str)
                 
-            # turn on led at pointer if moon is in upper hemisphere
+            # turn on led at pointer (the one end pointing at the moon)
             if alt >= 0:
-                intensity = 1
+                np[1] = (100,100,0)
+                np[0] = (0,0,120)
             else:
-                intensity = 0
-            #np[0] = (int(255*intensity),int(25*intensity),int(25*intensity)) # color ?
-            #np.write()
+                np[1] = (0,0,120)
+                np[0] = (100,100,0)
+            np.write()
 
             
             # Update Servos
@@ -226,12 +222,6 @@ async def tracker(delay_ms):
             t = t + delay_ms/1000.0 * FAST_FORWARD_FACTOR
         else:
             t = time.time()
-        
-
-#async def updatetime(delay_sec):
-#    while True:
-#        ntptime.settime()
-#        await asyncio.sleep(delay_sec)
 
 async def getGPSFix(delay_sec):
     global latitude, longitude
